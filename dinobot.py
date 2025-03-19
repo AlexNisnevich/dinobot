@@ -6,7 +6,6 @@ import discord
 from discord.ext import commands
 import uuid
 import os
-import yaml
 import random
 import re
 
@@ -95,16 +94,13 @@ def fetch_panel(panel_name, panel_number):
 	return page.url
 
 def start_bot(bot):
-	f = open('config.yaml')
-	config_map = yaml.safe_load(f)
-	f.close()
 	# our emoji we use when we're happy. This will get populated by the YAML
 	# config file, because the ID varies per bot. The format is
 	# <:emojiname:emojiid>
 	# and you can find the ID from the discord application config panel
 	# put the string in as emojiid in the YAML.
-	bot.emojiid = config_map['emojiid']
-	bot.run(config_map['discordtoken'])
+	bot.emojiid = os.environ["EMOJI_ID"]
+	bot.run(os.environ["DISCORD_TOKEN"])
 
 def create_bot():
 	intents = discord.Intents.default()
