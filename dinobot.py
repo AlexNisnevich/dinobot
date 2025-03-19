@@ -8,16 +8,18 @@ import uuid
 import os
 import random
 import re
+import traceback
 
 # table of crop rectangles for the various panels. These were determined
 # using a paint program on a downloaded comic.
+SCALE = 735.0 / 900
 CROP_RECTANGLES = [
-	(0, 0, 297, 298),
-	(298, 0, 458, 298),
-	(457, 0, 899, 298),
-	(0, 296, 239, 595),
-	(237, 296, 604, 595),
-	(602, 296, 899, 595),
+	(0 * SCALE, 0 * SCALE, 297 * SCALE, 298 * SCALE),
+	(298 * SCALE, 0 * SCALE, 458 * SCALE, 298 * SCALE),
+	(457 * SCALE, 0 * SCALE, 899 * SCALE, 298 * SCALE),
+	(0 * SCALE, 296 * SCALE, 239 * SCALE, 595 * SCALE),
+	(237 * SCALE, 296 * SCALE, 604 * SCALE, 595 * SCALE),
+	(602 * SCALE, 296 * SCALE, 899 * SCALE, 595 * SCALE),
 ]
 
 # we have canned error messages for if commands are bogus. They are not helpful.
@@ -76,17 +78,38 @@ ERROR_MESSAGES = [
 ]
 
 # regex to look for "dino[saur][s]" in text, so we can react to it
-DINO_REGEX = re.compile(r'\bdino(saur)?(s)?\b', re.IGNORECASE)
+DINO_REGEX = re.compile(r"\bdino(saur)?(s)?\b", re.IGNORECASE)
 
-# fetch_panel will save off panel 2 from a random comic, and return the URL
-# of the comic
-def fetch_panel(panel_name, panel_number):
-	URL = "https://www.gocomics.com/random/dinosaur-comics"
-	page = requests.get(URL)
-	img_src = BeautifulSoup(page.content, 'html.parser').find_all('picture', class_='item-comic-image')[0].find('img')['src']
+def find_comic_panel_by_text(panel_name, search_text):
+	# Given search text, fetch a panel matching that text if possible and 
+	# save it to the given filename. Throws an error if no matching panel.
+	url = f"https://www.ohnorobot.com/index.php?s={search_text}&Search=Search&comic=23"
+	page = requests.get(url)
+	comic_url = random.sample(BeautifulSoup(page.content, "html.parser").find_all("div", class_="tinylink"), 1)[0].find("a")["href"]
+	return fetch_comic_panel(panel_name, comic_url, 1, search_text)
 
-	# fetch the image and chop out panel 2
-	# luckily, these offsets never change
+def find_random_comic_panel(panel_name, panel_number):
+	# Look up a random comic, take the given panel number, and 
+	# save it to the given filename.
+	url = "https://www.qwantz.com/archive.php"
+	page = requests.get(url)
+	comic_url = random.sample(BeautifulSoup(page.content, "html.parser").find_all("a"), 1)[0]["href"]
+	return fetch_comic_panel(panel_name, comic_url, panel_number)
+	
+def fetch_comic_panel(panel_name, comic_url, panel_number, search_text=None):
+	# Extract the comic from the given URL, 
+	# take a panel (either one matching search text if provided, or the given numbered panel),
+	# and save it to the given filename.
+	page = requests.get(comic_url)
+	soup = BeautifulSoup(page.content, "html.parser")
+	img_src = "https://qwantz.com/" + soup.find_all("img", class_="comic")[0]["src"]
+
+	if search_text is not None:
+		transcript_blocks = re.split(r"\<br/?\>\<br/?\>", soup.find("div", id="transcriptDiv").find("div", class_="padded").decode_contents())
+		matching_idxs = [i for i in range(len(transcript_blocks)) if search_text in transcript_blocks[i]]
+		# prioritize panel_number if possible, otherwise just take a random matching panel
+		panel_number = panel_number if panel_number in matching_idxs else random.sample(matching_idxs, 1)[0]
+
 	png_data = requests.get(img_src)
 	with Image.open(BytesIO(png_data.content)) as img:
 		panel = img.crop(CROP_RECTANGLES[panel_number])
@@ -129,7 +152,7 @@ async def on_message(message):
 		# default to the second panel, if we don't have a parameter
 		# we send it in as a two, though, because it has to match
 		# what the user would send 
-		await qwantz(message.channel, parts[1] if len(parts) > 1 else 2)
+		await qwantz(message.channel, " ".join(parts[1:]).lower() if len(parts) > 1 else 2)
 	elif DINO_REGEX.search(message.content):
 		await message.add_reaction(bot.emojiid)
 
@@ -137,26 +160,29 @@ async def on_message(message):
 # an option, because that's usually the funniest panel
 # note that the panel numbers are one-indexed, because it's a human
 # on the other end. I mean, probably.
-async def qwantz(channel, target_panel):
-	# we need to be careful with the panel parameter, because some 
-	# smartass in one of my servers is definitely going to try 
-	# "$qwantz -1", "$qwantz 42069", and/or "$qwantz beer"
+async def qwantz(channel, argument):
 	try:
-		panel_number = int(target_panel)
-		# this is dumb, but a negative index for a panel number could
-		# be here (see: smartasses), and python will just treat it as an index 
-		# from the end of the list of panels. That is goofy, so we'll just 
-		# return an error in that case. Again, not a helpful one.
-		if panel_number < 1:
-			raise IndexError("Nice try.")
 		file_name = "{0}.gif".format(str(uuid.uuid4()))
-		# make sure to subtract one to make the panel_number zero-indexed
-		url = fetch_panel(file_name, panel_number - 1)
+
+		if argument.isdigit():
+			panel_number = int(argument)
+			# this is dumb, but a negative index for a panel number could
+			# be here (see: smartasses), and python will just treat it as an index 
+			# from the end of the list of panels. That is goofy, so we'll just 
+			# return an error in that case. Again, not a helpful one.
+			if panel_number < 1:
+				raise IndexError("Nice try.")
+			# make sure to subtract one to make the panel_number zero-indexed
+			url = find_random_comic_panel(file_name, panel_number - 1)
+		else:
+			url = find_comic_panel_by_text(file_name, argument)
+		
 		with open(file_name, 'rb') as fp:
 			file_to_send = discord.File(fp, filename=file_name)
-			await channel.send("Today is a good day I think for sending a [panel]({0}).".format(url), file=file_to_send)
+			await channel.send(f"Today is a good day I think for sending a [panel](<{url}>).", file=file_to_send)
 		os.remove(file_name)
 	except (ValueError, IndexError) as e:
+		traceback.print_exc()
 		await channel.send(random.choice(ERROR_MESSAGES))
 
 # start up our bot (using the token from the YAML file)
