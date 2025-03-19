@@ -81,28 +81,33 @@ ERROR_MESSAGES = [
 DINO_REGEX = re.compile(r"\bdino(saur)?(s)?\b", re.IGNORECASE)
 
 def find_comic_panel_by_text(panel_name, search_text):
+	# Given search text, fetch a panel matching that text if possible and 
+	# save it to the given filename. Throws an error if no matching panel.
 	url = f"https://www.ohnorobot.com/index.php?s={search_text}&Search=Search&comic=23"
 	page = requests.get(url)
 	comic_url = random.sample(BeautifulSoup(page.content, "html.parser").find_all("div", class_="tinylink"), 1)[0].find("a")["href"]
 	return fetch_comic_panel(panel_name, comic_url, 1, search_text)
 
 def find_random_comic_panel(panel_name, panel_number):
+	# Look up a random comic, take the given panel number, and 
+	# save it to the given filename.
 	url = "https://www.qwantz.com/archive.php"
 	page = requests.get(url)
 	comic_url = random.sample(BeautifulSoup(page.content, "html.parser").find_all("a"), 1)[0]["href"]
 	return fetch_comic_panel(panel_name, comic_url, panel_number)
 	
-def fetch_comic_panel(panel_name, comic_url, panel_number=1, search_text=None):
+def fetch_comic_panel(panel_name, comic_url, panel_number, search_text=None):
+	# Extract the comic from the given URL, 
+	# take a panel (either one matching search text if provided, or the given numbered panel),
+	# and save it to the given filename.
 	page = requests.get(comic_url)
 	soup = BeautifulSoup(page.content, "html.parser")
 	img_src = "https://qwantz.com/" + soup.find_all("img", class_="comic")[0]["src"]
 
 	if search_text is not None:
 		transcript_blocks = re.split(r"\<br/?\>\<br/?\>", soup.find("div", id="transcriptDiv").find("div", class_="padded").decode_contents())
-		print(transcript_blocks)
 		matching_idxs = [i for i in range(len(transcript_blocks)) if search_text in transcript_blocks[i]]
-		print(matching_idxs)
-		# prioritize panel 2, otherwise who cares
+		# prioritize panel_number if possible, otherwise just take a random matching panel
 		panel_number = panel_number if panel_number in matching_idxs else random.sample(matching_idxs, 1)[0]
 
 	png_data = requests.get(img_src)
