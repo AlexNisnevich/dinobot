@@ -54,8 +54,8 @@ When the bot sees a message starting with `$qwantz`, it will try to respond with
 Supported `$qwantz` syntax:
 ```
     $qwantz 				- post 2nd panel of random comic
-    $qwantz [n]				- if n>5, post 2nd panel of nth comic
-                            - if n≤5, post nth panel of random comic
+    $qwantz [n]				- if n>6, post 2nd panel of nth comic
+                            - if n≤6, post nth panel of random comic
     $qwantz [n] [i]			- post ith panel of nth comic
     $qwantz [search phrase] - post a panel containing that phrase (if any)
 ```

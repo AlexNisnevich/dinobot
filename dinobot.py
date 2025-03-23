@@ -90,11 +90,12 @@ async def qwantz(channel, args):
 	Entry point for responding to messages starting with $qwantz.
 	Find an appropriate comic panel and post it.
 	Supported syntaxes:
-		$qwantz 				- post 2nd panel of random comic
-		$qwantz [n]				- if n>5, post 2nd panel of nth comic
-								- if n≤5, post nth panel of random comic
-		$qwantz [n] [i]			- post ith panel of nth comic
-		$qwantz [search phrase] - post a panel containing that phrase (if any)
+		$qwantz 					- post 2nd panel of random comic
+		$qwantz [n]					- if n>6, post 2nd panel of nth comic
+									- if n≤6, post nth panel of random comic
+		$qwantz [n] [i]				- post ith panel of nth comic
+		$qwantz [search phrase] 	- post (any) panel containing that phrase (if any)
+		$qwantz [search phrase] [i] - post an ith panel containing that phrase (if any)
 	"""
 	try:
 		file_name = "{0}.gif".format(str(uuid.uuid4()))
@@ -114,6 +115,9 @@ async def qwantz(channel, args):
 			else: 
 				# make sure to subtract one to make the panel_number zero-indexed
 				url = find_random_comic_panel(file_name, panel_number - 1)
+		elif args[-1].isdigit():
+			# $qwantz [search text] [i] syntax - pull appropriate ith panel of comic matching search text
+			url = find_comic_panel_by_text(file_name, " ".join(args[:-1]), int(args[-1]))
 		else:
 			# $qwantz [search text] syntax - pull appropriate panel of comic matching search text
 			url = find_comic_panel_by_text(file_name, " ".join(args))
@@ -127,11 +131,16 @@ async def qwantz(channel, args):
 		await channel.send(random.choice(ERROR_MESSAGES))
 
 
-def find_comic_panel_by_text(panel_name, search_text):#
+def find_comic_panel_by_text(panel_name, search_text, panel_number = None):
 	# Given search text, fetch a panel matching that text if possible and 
 	# save it to the given filename. Throws an error if no matching panel.
+	# If panel_number is passed, only search in that numbered panel of each comic (1-indexed).
 	url = f"https://www.qwantz.com/search.php"
-	payload = { "s" : search_text, "search": 1, "panel1": 1, "panel2": 1, "panel3": 1, "panel4": 1, "panel5": 1, "panel6": 1 }
+	if panel_number is not None:
+		payload = { "s" : search_text, "search": 1 }
+		payload[f"panel{panel_number}"] = 1
+	else:
+		payload = { "s" : search_text, "search": 1, "panel1": 1, "panel2": 1, "panel3": 1, "panel4": 1, "panel5": 1, "panel6": 1 }
 
 	first_page = requests.post(url, data=payload)
 	soup = BeautifulSoup(first_page.content, "html.parser")
