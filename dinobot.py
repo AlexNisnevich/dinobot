@@ -154,7 +154,7 @@ def find_comic_panel_by_text(panel_name, search_text, panel_number = None):
 	page = requests.post(url, data=payload)
 	soup = BeautifulSoup(page.content, "html.parser")
 	comic_url = soup.find("form").find_all("li")[comic_idx_on_page].find("a")["href"]
-	return fetch_comic_panel(panel_name, comic_url, 1, search_text)
+	return fetch_comic_panel(panel_name, comic_url, panel_number - 1, search_text)
 
 
 def find_random_comic_panel(panel_name, panel_number):
