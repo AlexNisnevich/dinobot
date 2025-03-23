@@ -84,90 +84,18 @@ DINO_REGEX = re.compile(r"\bdino(saur)?(s)?\b", re.IGNORECASE)
 # number of results returned on each page of https://www.qwantz.com/search.php
 SEARCH_RESULTS_PER_PAGE = 5
 
-def find_comic_panel_by_text(panel_name, search_text):
-	# Given search text, fetch a panel matching that text if possible and 
-	# save it to the given filename. Throws an error if no matching panel.
-	url = f"https://www.qwantz.com/search.php"
-	payload = { "s" : search_text, "search": 1, "panel1": 1, "panel2": 1, "panel3": 1, "panel4": 1, "panel5": 1, "panel6": 1 }
-
-	first_page = requests.post(url, data=payload)
-	soup = BeautifulSoup(first_page.content, "html.parser")
-
-	num_results_returned = int(soup.find("span", class_="grey").decode_contents().split()[0])
-	comic_idx = random.randint(1, num_results_returned) - 1
-	page_idx = comic_idx // SEARCH_RESULTS_PER_PAGE
-	comic_idx_on_page = comic_idx % SEARCH_RESULTS_PER_PAGE
-
-	payload["page"] = page_idx
-	page = requests.post(url, data=payload)
-	soup = BeautifulSoup(page.content, "html.parser")
-	comic_url = soup.find("form").find_all("li")[comic_idx_on_page].find("a")["href"]
-	return fetch_comic_panel(panel_name, comic_url, 1, search_text)
-
-def find_random_comic_panel(panel_name, panel_number):
-	# Look up a random comic, take the given panel number, and 
-	# save it to the given filename.
-	url = "https://www.qwantz.com/archive.php"
-	page = requests.get(url)
-	comic_url = random.sample(BeautifulSoup(page.content, "html.parser").find_all("a"), 1)[0]["href"]
-	return fetch_comic_panel(panel_name, comic_url, panel_number)
-	
-def fetch_comic_panel(panel_name, comic_url, panel_number, search_text=None):
-	# Extract the comic from the given URL, 
-	# take a panel (either one matching search text if provided, or the given numbered panel),
-	# and save it to the given filename.
-	page = requests.get(comic_url)
-	soup = BeautifulSoup(page.content, "html.parser")
-	img_src = "https://qwantz.com/" + soup.find_all("img", class_="comic")[0]["src"]
-
-	if search_text is not None:
-		transcript_blocks = re.split(r"\<br/?\>\<br/?\>", soup.find("div", id="transcriptDiv").find("div", class_="padded").decode_contents())
-		matching_idxs = [i for i in range(len(transcript_blocks)) if search_text in transcript_blocks[i].lower()]
-		# prioritize panel_number if possible, otherwise just take a random matching panel
-		panel_number = panel_number if panel_number in matching_idxs else random.sample(matching_idxs, 1)[0]
-
-	png_data = requests.get(img_src)
-	with Image.open(BytesIO(png_data.content)) as img:
-		panel = img.crop(CROP_RECTANGLES[panel_number])
-		panel.save(panel_name)
-	return page.url
-
-def start_bot(bot):
-	# our emoji we use when we're happy. This will get populated by the YAML
-	# config file, because the ID varies per bot. The format is
-	# <:emojiname:emojiid>
-	# and you can find the ID from the discord application config panel
-	# put the string in as emojiid in the YAML.
-	bot.emojiid = os.environ["EMOJI_ID"]
-	bot.run(os.environ["DISCORD_TOKEN"])
-
-def create_bot():
-	intents = discord.Intents.default()
-	intents.message_content = True
-
-	# note that we're using the lower level Client instead of Commands, because
-	# we want to listen for certain words in all messages, and the framework
-	# doesn't let us do that as well as use the commands framework
-	return discord.Client(intents=intents)
-
-
-# create our bot to add our event handler to it
-bot = create_bot()
-
-# main message handler - we're going to look for our commands here,
-# as well as the word "dino[saurs]", which will make us happy.
-@bot.event
-async def on_message(message):
-	if message.author == bot.user:
-		return
-
-	if message.content.startswith('$qwantz'):
-		args = message.content.lower().split(' ')[1:]
-		await qwantz(message.channel, args)
-	elif DINO_REGEX.search(message.content):
-		await message.add_reaction(bot.emojiid)
 
 async def qwantz(channel, args):
+	"""
+	Entry point for responding to messages starting with $qwantz.
+	Find an appropriate comic panel and post it.
+	Supported syntaxes:
+		$qwantz 				- post 2nd panel of random comic
+		$qwantz [n]				- if n>5, post 2nd panel of nth comic
+								- if n≤5, post nth panel of random comic
+		$qwantz [n] [i]			- post ith panel of nth comic
+		$qwantz [search phrase] - post a panel containing that phrase (if any)
+	"""
 	try:
 		file_name = "{0}.gif".format(str(uuid.uuid4()))
 
@@ -198,4 +126,82 @@ async def qwantz(channel, args):
 		traceback.print_exc()
 		await channel.send(random.choice(ERROR_MESSAGES))
 
-start_bot(bot)
+
+def find_comic_panel_by_text(panel_name, search_text):#
+	# Given search text, fetch a panel matching that text if possible and 
+	# save it to the given filename. Throws an error if no matching panel.
+	url = f"https://www.qwantz.com/search.php"
+	payload = { "s" : search_text, "search": 1, "panel1": 1, "panel2": 1, "panel3": 1, "panel4": 1, "panel5": 1, "panel6": 1 }
+
+	first_page = requests.post(url, data=payload)
+	soup = BeautifulSoup(first_page.content, "html.parser")
+
+	num_results_returned = int(soup.find("span", class_="grey").decode_contents().split()[0])
+	comic_idx = random.randint(1, num_results_returned) - 1
+	page_idx = comic_idx // SEARCH_RESULTS_PER_PAGE
+	comic_idx_on_page = comic_idx % SEARCH_RESULTS_PER_PAGE
+
+	payload["page"] = page_idx
+	page = requests.post(url, data=payload)
+	soup = BeautifulSoup(page.content, "html.parser")
+	comic_url = soup.find("form").find_all("li")[comic_idx_on_page].find("a")["href"]
+	return fetch_comic_panel(panel_name, comic_url, 1, search_text)
+
+
+def find_random_comic_panel(panel_name, panel_number):
+	# Look up a random comic, take the given panel number, and 
+	# save it to the given filename.
+	url = "https://www.qwantz.com/archive.php"
+	page = requests.get(url)
+	comic_url = random.sample(BeautifulSoup(page.content, "html.parser").find_all("a"), 1)[0]["href"]
+	return fetch_comic_panel(panel_name, comic_url, panel_number)
+
+
+def fetch_comic_panel(panel_name, comic_url, panel_number, search_text=None):
+	# Extract the comic from the given URL, 
+	# take a panel (either one matching search text if provided, or the given numbered panel),
+	# and save it to the given filename.
+	page = requests.get(comic_url)
+	soup = BeautifulSoup(page.content, "html.parser")
+	img_src = "https://qwantz.com/" + soup.find_all("img", class_="comic")[0]["src"]
+
+	if search_text is not None:
+		transcript_blocks = re.split(r"\<br/?\>\<br/?\>", soup.find("div", id="transcriptDiv").find("div", class_="padded").decode_contents())
+		matching_idxs = [i for i in range(len(transcript_blocks)) if search_text in transcript_blocks[i].lower()]
+		# prioritize panel_number if possible, otherwise just take a random matching panel
+		panel_number = panel_number if panel_number in matching_idxs else random.sample(matching_idxs, 1)[0]
+
+	png_data = requests.get(img_src)
+	with Image.open(BytesIO(png_data.content)) as img:
+		panel = img.crop(CROP_RECTANGLES[panel_number])
+		panel.save(panel_name)
+	return page.url
+
+
+def create_bot():
+	intents = discord.Intents.default()
+	intents.message_content = True
+
+	# note that we're using the lower level Client instead of Commands, because
+	# we want to listen for certain words in all messages, and the framework
+	# doesn't let us do that as well as use the commands framework
+	return discord.Client(intents=intents)
+
+
+# create our bot to add our event handler to it
+bot = create_bot()
+
+# main message handler - we're going to look for our commands here,
+# as well as the word "dino[saurs]", which will make us happy.
+@bot.event
+async def on_message(message):
+	if message.author == bot.user:
+		return
+
+	if message.content.startswith('$qwantz'):
+		args = message.content.lower().split(' ')[1:]
+		await qwantz(message.channel, args)
+	elif DINO_REGEX.search(message.content) and "EMOJI_ID" in os.environ:
+		await message.add_reaction(os.environ["EMOJI_ID"])
+
+bot.run(os.environ["DISCORD_TOKEN"])
