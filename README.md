@@ -25,10 +25,14 @@ pip install -r requirements.txt
 ## Running the bot
 
 To run the bot locally:
-```python dinobot.py```
+```
+python dinobot.py
+```
 
-On a Linux server you may want to use `nohup` to keep the process running when you close the terminal:
-```nohup python dinobot.py```
+On a server, you may want to use `nohup` to keep the process running when you close the terminal:
+```
+nohup python dinobot.py
+```
 
 Or set it up as a systemd service. You can use this as a model for a systemd service file:
 ```
