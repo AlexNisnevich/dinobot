@@ -53,11 +53,12 @@ When the bot sees a message starting with `$qwantz`, it will try to respond with
 
 Supported `$qwantz` syntax:
 ```
-    $qwantz 				- post 2nd panel of random comic
-    $qwantz [n]				- if n>6, post 2nd panel of nth comic
-                            - if n≤6, post nth panel of random comic
-    $qwantz [n] [i]			- post ith panel of nth comic
-    $qwantz [search phrase] - post a panel containing that phrase (if any)
+    $qwantz 					- post 2nd panel of random comic
+    $qwantz [n]					- if n>6, post 2nd panel of nth comic
+                                - if n≤6, post nth panel of random comic
+    $qwantz [n] [i]				- post ith panel of nth comic
+    $qwantz [search phrase] 	- post (any) panel containing that phrase (if any)
+    $qwantz [search phrase] [i] - post an ith panel containing that phrase (if any)
 ```
 
 If an `EMOJI_ID` environment variable is provided, the bot will also respond with that emoji to messages containing variations on the words "dino" or "dinosaur".
