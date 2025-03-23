@@ -122,7 +122,7 @@ async def qwantz(channel, args):
 			file_to_send = discord.File(fp, filename=file_name)
 			await channel.send(f"Today is a good day I think for sending a [panel](<{url}>).", file=file_to_send)
 		os.remove(file_name)
-	except (ValueError, IndexError) as e:
+	except (ValueError, IndexError, AttributeError) as e:
 		traceback.print_exc()
 		await channel.send(random.choice(ERROR_MESSAGES))
 
