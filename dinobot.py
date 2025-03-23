@@ -1,14 +1,15 @@
-from bs4 import BeautifulSoup
-import requests
-from PIL import Image
 from io import BytesIO
-import discord
-from discord.ext import commands
-import uuid
 import os
 import random
 import re
 import traceback
+import uuid
+
+from bs4 import BeautifulSoup
+import requests
+from PIL import Image
+import discord
+from discord.ext import commands
 
 # table of crop rectangles for the various panels. These were determined
 # using a paint program on a downloaded comic.
@@ -80,14 +81,27 @@ ERROR_MESSAGES = [
 # regex to look for "dino[saur][s]" in text, so we can react to it
 DINO_REGEX = re.compile(r"\bdino(saur)?(s)?\b", re.IGNORECASE)
 
+# number of results returned on each page of https://www.qwantz.com/search.php
+SEARCH_RESULTS_PER_PAGE = 5
+
 def find_comic_panel_by_text(panel_name, search_text):
 	# Given search text, fetch a panel matching that text if possible and 
 	# save it to the given filename. Throws an error if no matching panel.
 	url = f"https://www.qwantz.com/search.php"
-	payload = { "s" : search_text, "search": "Search!", "panel1": "1", "panel2": "1", "panel3": "1", "panel4": 1, "panel5": 1, "panel6": 1 }
+	payload = { "s" : search_text, "search": 1, "panel1": 1, "panel2": 1, "panel3": 1, "panel4": 1, "panel5": 1, "panel6": 1 }
 
+	first_page = requests.post(url, data=payload)
+	soup = BeautifulSoup(first_page.content, "html.parser")
+
+	num_results_returned = int(soup.find("span", class_="grey").decode_contents().split()[0])
+	comic_idx = random.randint(1, num_results_returned) - 1
+	page_idx = comic_idx // SEARCH_RESULTS_PER_PAGE
+	comic_idx_on_page = comic_idx % SEARCH_RESULTS_PER_PAGE
+
+	payload["page"] = page_idx
 	page = requests.post(url, data=payload)
-	comic_url = random.sample(BeautifulSoup(page.content, "html.parser").find("form").find_all("a"), 1)[0]["href"]
+	soup = BeautifulSoup(page.content, "html.parser")
+	comic_url = soup.find("form").find_all("li")[comic_idx_on_page].find("a")["href"]
 	return fetch_comic_panel(panel_name, comic_url, 1, search_text)
 
 def find_random_comic_panel(panel_name, panel_number):
@@ -148,36 +162,33 @@ async def on_message(message):
 		return
 
 	if message.content.startswith('$qwantz'):
-		# split the message, and send the first word after the command
-		# (if any) as the first parameter
-		parts = message.content.split(' ')
-		# default to the second panel, if we don't have a parameter
-		# we send it in as a two, though, because it has to match
-		# what the user would send 
-		await qwantz(message.channel, " ".join(parts[1:]).lower() if len(parts) > 1 else 2)
+		args = message.content.lower().split(' ')[1:]
+		await qwantz(message.channel, args)
 	elif DINO_REGEX.search(message.content):
 		await message.add_reaction(bot.emojiid)
 
-# we're going to default to the second panel, if the user doesn't provide
-# an option, because that's usually the funniest panel
-# note that the panel numbers are one-indexed, because it's a human
-# on the other end. I mean, probably.
-async def qwantz(channel, argument):
+async def qwantz(channel, args):
 	try:
 		file_name = "{0}.gif".format(str(uuid.uuid4()))
 
-		if argument.isdigit():
-			panel_number = int(argument)
-			# this is dumb, but a negative index for a panel number could
-			# be here (see: smartasses), and python will just treat it as an index 
-			# from the end of the list of panels. That is goofy, so we'll just 
-			# return an error in that case. Again, not a helpful one.
-			if panel_number < 1:
-				raise IndexError("Nice try.")
-			# make sure to subtract one to make the panel_number zero-indexed
-			url = find_random_comic_panel(file_name, panel_number - 1)
+		if len(args) == 0:
+			# zero-argument syntax - pull 2nd panel of random comic
+			url = find_random_comic_panel(file_name, 2 - 1)
+		elif len(args) > 1 and args[0].isdigit() and args[1].isdigit():
+			# $qwantz [comic_id] [panel_id] syntax - pull specific panel of specific comic
+			url = fetch_comic_panel(file_name, f"https://www.qwantz.com/index.php?comic={args[0]}", int(args[1]) - 1)
+		elif args[0].isdigit():
+			# $qwantz [panel_id] or no-argument syntax - pull specific panel of random comic (default to 2nd panel)
+			panel_number = int(args[0])
+			if panel_number > 6:
+				# ok probably the user just wants a specific comic then
+				url = fetch_comic_panel(file_name, f"https://www.qwantz.com/index.php?comic={panel_number}", 2 - 1)
+			else: 
+				# make sure to subtract one to make the panel_number zero-indexed
+				url = find_random_comic_panel(file_name, panel_number - 1)
 		else:
-			url = find_comic_panel_by_text(file_name, argument)
+			# $qwantz [search text] syntax - pull appropriate panel of comic matching search text
+			url = find_comic_panel_by_text(file_name, " ".join(args))
 		
 		with open(file_name, 'rb') as fp:
 			file_to_send = discord.File(fp, filename=file_name)
@@ -187,5 +198,4 @@ async def qwantz(channel, argument):
 		traceback.print_exc()
 		await channel.send(random.choice(ERROR_MESSAGES))
 
-# start up our bot (using the token from the YAML file)
 start_bot(bot)
