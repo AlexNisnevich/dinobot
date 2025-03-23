@@ -1,8 +1,6 @@
-**TODO update readme**
-
 # Description
 
-Discord Bot for posting [Dinosaur Comics](https://www.qwantz.com/) panels. 
+Discord Bot for posting [Dinosaur Comics](https://www.qwantz.com/) panels. Forked from [jbuergel/dinobot](https://github.com/jbuergel/dinobot) with many added features (search support, etc).
 
 # Installation
 
@@ -30,7 +28,7 @@ To run the bot locally:
 ```python dinobot.py```
 
 On a Linux server you may want to use `nohup` to keep the process running when you close the terminal:
-```nohup python dinobot.py`
+```nohup python dinobot.py```
 
 Or set it up as a systemd service. You can use this as a model for a systemd service file:
 ```
