@@ -1,3 +1,5 @@
+**TODO update readme**
+
 # dinobot
 Discord Bot for posting a panel of a random Dinosaur Comic. It defaults to panel two, which is usually the funniest, but you can specify another panel number. You know, out of six.
 
